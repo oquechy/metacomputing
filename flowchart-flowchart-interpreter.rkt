@@ -1,0 +1,58 @@
+#lang racket
+
+(provide fc-fc-int)
+
+(require "flowchart-interpreter.rkt")
+(require "mix-utils.rkt")
+
+(define fc-fc-int
+  `((read program data)
+    (init (:= ctx (map list (cdar program) data))
+          (:= prog (cdr program))
+          (:= label (caar prog))
+          (goto int-block))
+    (int-block (:= block (findf (λ (b) (equal? (car b) label)) prog))
+               (:= line (cadr block))
+               (:= tail (cddr block))
+               (:= op (car line))
+               (goto check-asn))
+    (check-asn (if (equal? op ':=) int-asn check-goto))
+    (check-goto (if (equal? op 'goto) int-goto check-if))
+    (check-if (if (equal? op 'if) int-if check-ret))
+    (check-ret (if (equal? op 'return) int-ret err))
+    (err (return (~a "unsupported instruction" line)))
+    (int-asn (:= name (cadr line))
+             (:= expr (caddr line))
+             (:= value (,eval-ctx ctx expr))
+             (:= ctx (,clear-ctx ctx name))
+             (:= ctx (cons (list name value) ctx))
+             (goto int-instr))
+    (int-goto (:= label (cadr line))
+              (goto int-block))
+    (int-if (:= expr (cadr line))
+            (if (,eval-ctx ctx expr) int-if-t int-if-f))
+    (int-if-t (:= label (caddr line))
+              (goto int-block))
+    (int-if-f (:= label (cadddr line))
+              (goto int-block))
+    (int-ret (return (,eval-ctx ctx (cadr line))))
+    (int-instr (:= line (car tail))
+               (:= tail (cdr tail))
+               (:= op (car line))
+               (goto check-asn))
+    ))
+
+(define find_name
+  '((read name namelist valuelist)
+    (search (if (equal? name (car namelist)) found cont))
+    (cont (:= valuelist (cdr valuelist))
+          (:= namelist (cdr namelist))
+          (goto search))
+    (found (return (car valuelist)))
+    ))
+
+
+(display "fc-fc-int(find_name) ")
+(assert (fc-int fc-fc-int `[,find_name [c [a b c d] [1 2 3 4]]])
+        3
+        "fc-fc-int failed")

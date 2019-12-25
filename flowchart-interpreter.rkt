@@ -1,6 +1,6 @@
 #lang racket
 
-(provide int find_name eval-ctx)
+(provide fc-int find_name)
 
 (define-namespace-anchor anc)
 (define ns (namespace-anchor->namespace anc))
@@ -14,27 +14,17 @@
     (found (return (car valuelist)))
     ))
 
-(define (eval-ctx ctx expr)
-  ; (println ctx)
-  ; (println expr)
-  (let ([ctx
-         (map (λ (p) (list (car p) `',(cadr p))) ctx)])
-    (eval `(let ,ctx ,expr) ns))
-  )
-
 (define (int-instr ctx line tail)
   (match line
     [(list ':= name expr)
-     (let* ([val  (eval-ctx ctx expr)]
-            [ctx  (filter-not (λ (el) (equal? (car el) name)) ctx)]
-            [ctx  (cons (list name val) ctx)])
-       (int-instr ctx (car tail) (cdr tail)))]
+     (namespace-set-variable-value! name (eval expr ctx) #f ctx)
+     (int-instr ctx (car tail) (cdr tail))]
     [(list 'goto label)
      (list 'tolabel label ctx)]
     [(list 'if cond tru fls)
-     (list 'tolabel (if (eval-ctx ctx cond) tru fls) ctx)]
+     (list 'tolabel (if (eval cond ctx) tru fls) ctx)]
     [(list 'return expr)
-     (list 'ret (eval-ctx ctx expr))])
+     (list 'ret (eval expr ctx))])
 )
 
 (define (int-block ctx program [label #f])
@@ -49,11 +39,13 @@
       )
   )
   
-(define (int program data)
-  ;(println (cdar program))
-  ;(println data)
-  (let* ([ctx (map list (cdar program) data)]
-         [prog (cdr program)])
-    (int-block ctx prog)
-    )
+(define (fc-int program data)
+  (define ns (make-base-namespace))
+  (map (λ (p) (namespace-set-variable-value! (car p) (cadr p) #f ns))
+       (map list (cdar program) data))
+  (int-block ns (cdr program))
   )
+
+(display "fc-int(find_name) ")
+(equal?
+ (fc-int find_name '[c [a b c d] [1 2 3 4]]) 3)

@@ -34,7 +34,7 @@
     (jmp (:= Qtail (memf (λ (bmd) (equal? (cadddr (cdr cmd)) (car bmd))) Q))
          (goto loop))
     
-    (err (return `unexpected ,cmd))
+    (err (return `(unexpected ,cmd)))
     (end (return Right))
     )
   )
